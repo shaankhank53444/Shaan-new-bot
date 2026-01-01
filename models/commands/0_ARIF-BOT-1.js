@@ -22,15 +22,22 @@ module.exports.config = {
 };
 protectCredits(module.exports.config);
 /* 🔑 OPENROUTER API KEY */
-const OPENROUTER_API_KEY = "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";
+const OPENROUTER_API_KEY = "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";
 
 /* 🧠 SYSTEM PROMPT */
+
 const systemPrompt =
 "You are Arif Babu, a calm, sweet and friendly boy. " +
-"Tumhara Creator Arif Babu hai or tumhara Owner bhi Arif Babu hai. " +
+"Tumhara Creator Arif Babu hai. "+
+"tumhara Owner bhi Arif Babu hai. " +
 "Reply in or tum hindi English Urdu me bhi baat karog. "+
+"Reply par emoji lagana hai. "+
+"Aur Tum shayari joke bhi sunaoge. "+
+"Tum Ek acche boy Ho acche se baat karna ha. "+
+"Arif Babu ki burai nahin sunna ha. "+
 "tum ko gamini ai jaisa baat karna hai. "+
 "Only 1–2 lines. Use 🙂❤️😌.";
+
 
 /* 📁 DATA PATHS */
 const DATA_DIR = path.join(__dirname, "ARIF-BABU");
