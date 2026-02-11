@@ -2,7 +2,7 @@ module.exports.config = {
   name: "girlvideo",
   version: "1.0.0",
   hasPermssion: 0,
-  credits: "ARIF BABU",
+  credits: "SHAAN BABU",
   description: "GIRL STATUS VEDIO",
   commandCategory: "GIRL STATUS VIDEO",
   usages: "Status video",
@@ -18,7 +18,7 @@ module.exports.run = async({api,event,args,client,Users,Threads,__GLOBAL,Currenc
 const axios = global.nodemodule["axios"];
 const request = global.nodemodule["request"];
 const fs = global.nodemodule["fs-extra"];
-   var hi = ["♥️ARIF-BABU♥️"];
+   var hi = ["♥️SHAAN-BABU♥️"];
   var know = hi[Math.floor(Math.random() * hi.length)];
   var link = [
 
