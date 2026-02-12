@@ -1,16 +1,15 @@
 module.exports = {
   config: {
     name: "linkAutoDownload",
-    version: "1.3.0",
+    version: "1.4.0",
     hasPermssion: 0,
-    credits: "Shaan Babu", // ✅ Updated Credit
-    description: "Automatically detects links in messages and downloads the file.",
+    credits: "Shaan Babu",
+    description: "Automatically detects links and downloads with platform title.",
     commandCategory: "Utilities",
     usages: "",
     cooldowns: 5,
   },
 
-  // ⛔ CREDIT PROTECTION — Updated for Shaan Babu
   onLoad: function () {
     const fs = require("fs");
     const path = __filename;
@@ -21,7 +20,6 @@ module.exports = {
       process.exit(1);
     }
   },
-  // ---------------------
 
   run: async function () {},
 
@@ -30,43 +28,45 @@ module.exports = {
     const fs = require("fs-extra");
     const { alldown } = require("arif-babu-downloader");
 
-    const body = (event.body || "").toLowerCase();
-
+    const body = (event.body || "").trim();
     if (!body.startsWith("https://")) return;
+
+    // Platform detection logic
+    let platform = "Video";
+    if (body.includes("facebook.com") || body.includes("fb.watch")) platform = "Facebook";
+    else if (body.includes("instagram.com")) platform = "Instagram";
+    else if (body.includes("tiktok.com")) platform = "TikTok";
+    else if (body.includes("youtube.com") || body.includes("youtu.be")) platform = "YouTube";
 
     try {
       api.setMessageReaction("⏳", event.messageID, () => {}, true);
 
-      const data = await alldown(event.body);
+      const data = await alldown(body);
 
       if (!data || !data.data || !data.data.high) {
         return api.sendMessage("❌ Valid download link not found.", event.threadID);
       }
 
       const videoURL = data.data.high;
+      const filePath = __dirname + `/cache/auto_${event.senderID}.mp4`;
 
-      const buffer = (
-        await axios.get(videoURL, { responseType: "arraybuffer" })
-      ).data;
-
-      const filePath = __dirname + "/cache/auto.mp4";
-      fs.writeFileSync(filePath, buffer);
+      const response = await axios.get(videoURL, { responseType: "arraybuffer" });
+      fs.writeFileSync(filePath, Buffer.from(response.data, "utf-8"));
 
       api.setMessageReaction("✅", event.messageID, () => {}, true);
 
       return api.sendMessage(
         {
-          body: `𝐷𝑂𝑊𝑁𝐿𝑂𝐴𝐷 𝐵𝑌:  »»𝑶𝑾𝑵𝑬𝑹««★™  »»𝑺𝑯𝑨𝑨𝑵««
-          `,
+          body: `✨❁ ━━ ━[ 𝐎𝐖𝐍𝐄𝐑 ]━ ━━ ❁✨\n\nᴛɪᴛʟᴇ: ${platform}\n\n✨❁ ━━ ━[ 𝑺𝑯𝑨𝑨𝑵 ]━ ━━ ❁✨`,
           attachment: fs.createReadStream(filePath),
         },
         event.threadID,
+        () => fs.unlinkSync(filePath), // Delete file after sending
         event.messageID
       );
     } catch (err) {
       api.setMessageReaction("❌", event.messageID, () => {}, true);
-      return api.sendMessage("❌ Error while downloading the link.", event.threadID);
+      // console.error(err);
     }
   },
 };
-                  
