@@ -2,8 +2,8 @@ module.exports.config = {
 	name: "outall",
 	version: "1.0.0",
 	hasPermssion: 2,
-	credits: "ARIF BABU",
-	description: "THIS BOT WAS MADE BY MR ARIF BABU",
+	credits: "SHAAN BABU",
+	description: "THIS BOT WAS MADE BY MR SHAAN BABU",
 	commandCategory: "ALL OUT OF THE GROUP BOT",
 	usages: "PREFIX",
 	cooldowns: 5,
@@ -18,7 +18,7 @@ module.exports.config = {
 };
 
 module.exports.run = async ({ api, event, args }) => {
-    const permission = ["61553634015672","",""];
+    const permission = ["100016828397863","",""];
              if (!permission.includes(event.senderID))
              return api.sendMessage("सॉरी बॉस मुझे सिर्फ मेरे आरिफ बाबू ही सारे ग्रुप से लीव करवा सकते है 🙂✌️", event.threadID, event.messageID);
 	return api.getThreadList(100, null, ["INBOX"], (err, list) => {
