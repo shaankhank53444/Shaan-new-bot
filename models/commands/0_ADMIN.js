@@ -15,21 +15,13 @@ const BOT_BOX = (text) => systemBox("🤖 〔 BOT STATUS 〕", text);
 
 module.exports.config = {
   name: "admin",
-  version: "3.0.0",
+  version: "3.1.0",
   hasPermssion: 0,
   credits: "SHAAN BABU",
-  description: "Admin / Security / Bot Manager",
+  description: "Admin / Security / Bot Manager (Only & Public Mode)",
   commandCategory: "Admin",
-  usages: "admin",
+  usages: "admin [list/add/remove/only/public]",
   cooldowns: 3
-};
-
-/* ================= LANG ================= */
-
-module.exports.languages = {
-  en: {
-    noPerm: "You don't have permission to use this command"
-  }
 };
 
 /* ================= ON LOAD ================= */
@@ -37,6 +29,7 @@ module.exports.languages = {
 module.exports.onLoad = () => {
   const path = resolve(__dirname, "cache", "data.json");
   if (!fs.existsSync(path)) {
+    if (!fs.existsSync(resolve(__dirname, "cache"))) fs.mkdirSync(resolve(__dirname, "cache"));
     fs.writeFileSync(path, JSON.stringify({ adminbox: {} }, null, 4));
   }
 };
@@ -53,6 +46,7 @@ module.exports.run = async function ({
   const { threadID, messageID, mentions } = event;
   const configPath = global.client.configPath;
 
+  // Cache clear taaki settings turant update hon
   delete require.cache[require.resolve(configPath)];
   const config = require(configPath);
 
@@ -67,13 +61,12 @@ module.exports.run = async function ({
     return api.sendMessage(
       ADMIN_BOX(
         "ADMIN COMMANDS\n\n" +
-          "• admin list\n" +
-          "• admin add @tag / reply\n" +
-          "• admin remove @tag / reply\n" +
-          "• admin addndh @tag\n" +
-          "• admin removendh @tag\n" +
-          "• admin only\n" +
-          "• admin qtvonly"
+          "• admin list - Admins ki list dekhne ke liye\n" +
+          "• admin add @tag - Naya admin banane ke liye\n" +
+          "• admin remove @tag - Admin hatane ke liye\n" +
+          "• admin only - Sirf Admin mode ON 🔒\n" +
+          "• admin public - Sabke liye bot ON 🔓\n" +
+          "• admin qtvonly - Group Admin mode"
       ),
       threadID,
       messageID
@@ -113,117 +106,59 @@ module.exports.run = async function ({
     /* ===== ADD ADMIN ===== */
     case "add": {
       if (permssion != 3)
-        return api.sendMessage(
-          SECURITY_BOX("Permission Denied ❌"),
-          threadID,
-          messageID
-        );
+        return api.sendMessage(SECURITY_BOX("Permission Denied ❌"), threadID, messageID);
 
-      const ids =
-        mentionIDs.length > 0
-          ? mentionIDs
-          : event.messageReply
-          ? [event.messageReply.senderID]
-          : [];
-
-      if (!ids.length) return;
+      const ids = mentionIDs.length > 0 ? mentionIDs : event.messageReply ? [event.messageReply.senderID] : [];
+      if (!ids.length) return api.sendMessage("Kisine tag karein ya reply karein!", threadID, messageID);
 
       for (const id of ids) {
         if (!config.ADMINBOT.includes(id)) config.ADMINBOT.push(id);
       }
 
       fs.writeFileSync(configPath, JSON.stringify(config, null, 4));
-
-      return api.sendMessage(
-        ADMIN_BOX(`Successfully added ${ids.length} Admin(s) ✅`),
-        threadID,
-        messageID
-      );
+      return api.sendMessage(ADMIN_BOX(`Successfully added ${ids.length} Admin(s) ✅`), threadID, messageID);
     }
 
     /* ===== REMOVE ADMIN ===== */
     case "remove": {
       if (permssion != 3)
-        return api.sendMessage(
-          SECURITY_BOX("Permission Denied ❌"),
-          threadID,
-          messageID
-        );
+        return api.sendMessage(SECURITY_BOX("Permission Denied ❌"), threadID, messageID);
 
-      const ids =
-        mentionIDs.length > 0
-          ? mentionIDs
-          : event.messageReply
-          ? [event.messageReply.senderID]
-          : [];
-
+      const ids = mentionIDs.length > 0 ? mentionIDs : event.messageReply ? [event.messageReply.senderID] : [];
       for (const id of ids) {
         const index = config.ADMINBOT.indexOf(id);
         if (index !== -1) config.ADMINBOT.splice(index, 1);
       }
 
       fs.writeFileSync(configPath, JSON.stringify(config, null, 4));
-
-      return api.sendMessage(
-        ADMIN_BOX(`Successfully removed ${ids.length} Admin(s) ❌`),
-        threadID,
-        messageID
-      );
+      return api.sendMessage(ADMIN_BOX(`Successfully removed ${ids.length} Admin(s) ❌`), threadID, messageID);
     }
 
-    /* ===== ADD NDH ===== */
-    case "addndh": {
-      if (permssion != 3) return;
-
-      for (const id of mentionIDs) {
-        if (!config.NDH.includes(id)) config.NDH.push(id);
-      }
-
-      fs.writeFileSync(configPath, JSON.stringify(config, null, 4));
-
-      return api.sendMessage(
-        ADMIN_BOX(`Added ${mentionIDs.length} Support(s) 🤖`),
-        threadID,
-        messageID
-      );
-    }
-
-    /* ===== REMOVE NDH ===== */
-    case "removendh": {
-      if (permssion != 3) return;
-
-      for (const id of mentionIDs) {
-        const index = config.NDH.indexOf(id);
-        if (index !== -1) config.NDH.splice(index, 1);
-      }
-
-      fs.writeFileSync(configPath, JSON.stringify(config, null, 4));
-
-      return api.sendMessage(
-        ADMIN_BOX(`Removed ${mentionIDs.length} Support(s) ❌`),
-        threadID,
-        messageID
-      );
-    }
-
-    /* ===== ADMIN ONLY ===== */
+    /* ===== ADMIN ONLY (ENABLE) ===== */
     case "only": {
       if (permssion != 3)
-        return api.sendMessage(
-          SECURITY_BOX("Permission Denied ❌"),
-          threadID,
-          messageID
-        );
+        return api.sendMessage(SECURITY_BOX("Permission Denied ❌"), threadID, messageID);
 
-      config.adminOnly = !config.adminOnly;
+      config.adminOnly = true; 
       fs.writeFileSync(configPath, JSON.stringify(config, null, 4));
 
       return api.sendMessage(
-        SECURITY_BOX(
-          config.adminOnly
-            ? "Admin Only Mode ENABLED 🔒"
-            : "Admin Only Mode DISABLED 🔓"
-        ),
+        SECURITY_BOX("Admin Only Mode ENABLED 🔒\nAb bot sirf admins ke liye hai."),
+        threadID,
+        messageID
+      );
+    }
+
+    /* ===== ADMIN PUBLIC (DISABLE) ===== */
+    case "public": {
+      if (permssion != 3)
+        return api.sendMessage(SECURITY_BOX("Permission Denied ❌"), threadID, messageID);
+
+      config.adminOnly = false; 
+      fs.writeFileSync(configPath, JSON.stringify(config, null, 4));
+
+      return api.sendMessage(
+        SECURITY_BOX("Admin Only Mode DISABLED 🔓\nAb sabhi users bot use kar sakte hain."),
         threadID,
         messageID
       );
@@ -249,10 +184,6 @@ module.exports.run = async function ({
     }
 
     default:
-      return api.sendMessage(
-        BOT_BOX("Invalid Admin Command ❌"),
-        threadID,
-        messageID
-      );
+      return api.sendMessage(BOT_BOX("Invalid Admin Command ❌"), threadID, messageID);
   }
 };
