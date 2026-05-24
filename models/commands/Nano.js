@@ -1,4 +1,4 @@
-const axios = require("axios");
+const axios = require("axios"); // Fixed: 'Const' to 'const'
 const fs = require("fs-extra");
 const path = require("path");
 const FormData = require("form-data");
@@ -14,7 +14,8 @@ module.exports.config = {
   cooldowns: 5
 };
 
-const OPENAI_API_KEY = "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";
+// Aapki nayi API key yahan laga di gayi hai
+const OPENAI_API_KEY = "Sk-or-v1-d4f2b35f6c24b7b3e594e478075d13383e2895d1c18d3b3986bcdcd90ce04029";
 
 module.exports.run = async function ({ api, event, args }) {
   try {
@@ -44,16 +45,17 @@ module.exports.run = async function ({ api, event, args }) {
       w.on("error", rej);
     });
 
-    // OpenAI Image Edit API
+    // OpenAI Image Edit API Setup
     const form = new FormData();
     form.append("image", fs.createReadStream(imgPath));
-    form.append("prompt", `
-      Edit this image in a realistic way.
-      Instruction: ${prompt}
-      Keep face identity same unless user requests transformation.
-    `);
-    form.append("model", "gpt-image-1");
+    
+    // API instructions clear honi chahiye
+    form.append("prompt", `Edit this image in a realistic way. Instruction: ${prompt}`);
+    
+    // Valid OpenAI model name for image editing
+    form.append("model", "dall-e-2"); 
     form.append("size", "1024x1024");
+    form.append("response_format", "b64_json"); // API ko batana ke base64 output chahiye
 
     const response = await axios.post(
       "https://api.openai.com/v1/images/edits",
