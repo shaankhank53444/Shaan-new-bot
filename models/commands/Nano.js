@@ -1,94 +1,105 @@
-const axios = require("axios"); // Fixed: 'Const' to 'const'
+const axios = require("axios");
 const fs = require("fs-extra");
 const path = require("path");
-const FormData = require("form-data");
 
 module.exports.config = {
   name: "nano",
   version: "1.0.0",
   hasPermssion: 0,
-  credits: "Shaan + ChatGPT",
-  description: "Nano Style AI Image Editor (ChatGPT)",
+  credits: "Shaan",
+  description: "Nano Style AI Image Editor (Google Gemini)",
   commandCategory: "ai",
   usages: "[reply image] [prompt]",
   cooldowns: 5
 };
 
-// Aapki nayi API key yahan laga di gayi hai
-const OPENAI_API_KEY = "Sk-or-v1-d4f2b35f6c24b7b3e594e478075d13383e2895d1c18d3b3986bcdcd90ce04029";
+// Yahan apni Google AI Studio ki key daalein (AIza... wali)
+const GOOGLE_API_KEY = "YAHAN_APNI_GOOGLE_GEMINI_KEY_DAALEN";
 
 module.exports.run = async function ({ api, event, args }) {
   try {
     const prompt = args.join(" ");
 
-    if (!event.messageReply?.attachments?.[0]) {
+    // Check agar user ne image reply nahi ki
+    if (!event.messageReply?.attachments?.[0] || event.messageReply.attachments[0].type !== "photo") {
       return api.sendMessage("❌ Kisi image ko reply karo.", event.threadID);
     }
 
+    // Check agar prompt nahi diya
     if (!prompt) {
       return api.sendMessage("❌ Prompt likho (example: make him a boy, change dress).", event.threadID);
     }
 
     const imgUrl = event.messageReply.attachments[0].url;
+    api.sendMessage("🧠 Nano AI image ko samajh raha hai...", event.threadID);
 
-    api.sendMessage("🧠 Nano AI processing image...", event.threadID);
+    // 1. Image Download aur Base64 mein convert karna
+    const imgResponse = await axios.get(imgUrl, { responseType: "arraybuffer" });
+    const base64Image = Buffer.from(imgResponse.data, "binary").toString("base64");
 
-    // download image
-    const imgPath = path.join(__dirname, "cache", `nano_${Date.now()}.png`);
+    // 2. Gemini 1.5 Flash se image analyze karwa kar ek perfect Master Prompt banana
+    const visionApiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GOOGLE_API_KEY}`;
+    
+    const visionPayload = {
+      contents: [{
+        parts: [
+          { text: `Describe this image in extreme detail (character, background, lighting). Then modify the description based on this instruction: "${prompt}". Return ONLY the final detailed prompt in English for an image generator, nothing else.` },
+          { inlineData: { mimeType: "image/jpeg", data: base64Image } }
+        ]
+      }]
+    };
 
-    const img = await axios.get(imgUrl, { responseType: "stream" });
+    const visionRes = await axios.post(visionApiUrl, visionPayload);
+    const masterPrompt = visionRes.data.candidates[0].content.parts[0].text.trim();
 
-    await new Promise((res, rej) => {
-      const w = fs.createWriteStream(imgPath);
-      img.data.pipe(w);
-      w.on("finish", res);
-      w.on("error", rej);
+    api.sendMessage(`✨ Image analyze ho gayi. Editing shuru ho rahi hai...\n(Generating: ${prompt})`, event.threadID);
+
+    // 3. Google Imagen 3 API se Nayi Image Generate karna
+    const imagenApiUrl = `https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-001:predict`;
+    
+    const imagenPayload = {
+      instances: [{ prompt: masterPrompt }],
+      parameters: { sampleCount: 1 }
+    };
+
+    const imagenRes = await axios.post(imagenApiUrl, imagenPayload, {
+      headers: {
+        "Content-Type": "application/json",
+        "x-goog-api-key": GOOGLE_API_KEY
+      }
     });
 
-    // OpenAI Image Edit API Setup
-    const form = new FormData();
-    form.append("image", fs.createReadStream(imgPath));
-    
-    // API instructions clear honi chahiye
-    form.append("prompt", `Edit this image in a realistic way. Instruction: ${prompt}`);
-    
-    // Valid OpenAI model name for image editing
-    form.append("model", "dall-e-2"); 
-    form.append("size", "1024x1024");
-    form.append("response_format", "b64_json"); // API ko batana ke base64 output chahiye
-
-    const response = await axios.post(
-      "https://api.openai.com/v1/images/edits",
-      form,
-      {
-        headers: {
-          Authorization: `Bearer ${OPENAI_API_KEY}`,
-          ...form.getHeaders()
-        }
-      }
-    );
-
-    const base64 = response.data.data[0].b64_json;
+    // 4. Base64 Output nikalna aur save karna
+    const generatedBase64 = imagenRes.data.predictions[0].bytesBase64Encoded;
     const outPath = path.join(__dirname, "cache", `nano_out_${Date.now()}.png`);
+    
+    fs.writeFileSync(outPath, Buffer.from(generatedBase64, "base64"));
 
-    fs.writeFileSync(outPath, Buffer.from(base64, "base64"));
-
+    // 5. User ko final image bhejna
     api.sendMessage(
       {
-        body: `✨ Nano Edit Done!\n📝 Prompt: ${prompt}`,
+        body: `✨ Nano Edit Done!\n📝 User Prompt: ${prompt}`,
         attachment: fs.createReadStream(outPath)
       },
       event.threadID,
       () => {
-        fs.unlinkSync(imgPath);
-        fs.unlinkSync(outPath);
+        // Cache se image delete kar dena taake storage full na ho
+        if (fs.existsSync(outPath)) {
+            fs.unlinkSync(outPath);
+        }
       }
     );
 
   } catch (err) {
-    console.log(err);
+    console.error(err.response?.data || err.message);
+    
+    let errorMsg = err.message;
+    if (err.response?.data?.error?.message) {
+        errorMsg = err.response.data.error.message;
+    }
+
     api.sendMessage(
-      `❌ Error: ${err.response?.data?.error?.message || err.message}`,
+      `❌ Error: ${errorMsg}\n\n⚠️ Check karein ke aapki Google API key theek hai.`,
       event.threadID
     );
   }
