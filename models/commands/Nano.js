@@ -14,7 +14,7 @@ module.exports.config = {
 };
 
 // Yahan apni Google AI Studio ki key daalein (AIza... wali)
-const GOOGLE_API_KEY = "YAHAN_APNI_GOOGLE_GEMINI_KEY_DAALEN";
+const GOOGLE_API_KEY = "AIzaSyAOiEgXphvf3yn9vtt-sGT_Sld-hhtbwr4";
 
 module.exports.run = async function ({ api, event, args }) {
   try {
