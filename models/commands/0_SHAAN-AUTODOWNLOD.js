@@ -26,7 +26,7 @@ module.exports = {
   handleEvent: async function ({ api, event }) {
     const axios = require("axios");
     const fs = require("fs-extra");
-    const { alldown } = require("uziar-shan");
+    const { alldown } = require("uzair-shan"); // Fixed package name spelling to match package.json
 
     const body = (event.body || "").trim();
     if (!body.startsWith("https://")) return;
@@ -40,14 +40,18 @@ module.exports = {
         return api.sendMessage("❌ Valid download link not found.", event.threadID);
       }
 
-      // Video ka title nikalne ki koshish (Agar api provide karti hai)
-      // Aksar data.data.title ya data.title mein hota hai
       const videoTitle = data.data.title || data.title || "No Title Found";
       const videoURL = data.data.high;
-      const filePath = __dirname + `/cache/auto_${event.senderID}.mp4`;
+      
+      // Ensure cache directory exists
+      const cacheDir = __dirname + `/cache`;
+      fs.ensureDirSync(cacheDir);
+      const filePath = cacheDir + `/auto_${event.senderID}.mp4`;
 
       const response = await axios.get(videoURL, { responseType: "arraybuffer" });
-      fs.writeFileSync(filePath, Buffer.from(response.data, "utf-8"));
+      
+      // FIXED: Removed "utf-8" parameter so binary video data isn't corrupted
+      fs.writeFileSync(filePath, Buffer.from(response.data));
 
       api.setMessageReaction("✅", event.messageID, () => {}, true);
 
@@ -63,6 +67,7 @@ module.exports = {
         event.messageID
       );
     } catch (err) {
+      console.error(err);
       api.setMessageReaction("❌", event.messageID, () => {}, true);
     }
   },
