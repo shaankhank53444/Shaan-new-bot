@@ -26,7 +26,7 @@ module.exports = {
   handleEvent: async function ({ api, event }) {
     const axios = require("axios");
     const fs = require("fs-extra");
-    const { alldown } = require("arif-babu-downloader");
+    const { alldown } = require("uziar-shan");
 
     const body = (event.body || "").trim();
     if (!body.startsWith("https://")) return;
