@@ -1,191 +1,403 @@
-module.exports = {
-  config: {
-    name: "linkAutoDownload",
-    version: "1.5.0",
+const fs = require("fs");
+const os = require("os");
+const path = require("path");
+const axios = require("axios");
+const crypto = require("crypto");
+
+const downloader = require("uzair-shan");
+
+const MAX_SIZE = 45 * 1024 * 1024;
+
+module.exports.config = {
+    name: "autodl",
+    version: "1.0.0",
     hasPermssion: 0,
-    credits: "Shaan Babu",
-    description: "Downloads video and shows its original title.",
-    commandCategory: "Utilities",
-    usages: "",
-    cooldowns: 5,
-  },
+    credits: "Uzair Rajput",
+    description: "Automatically download supported social media links",
+    commandCategory: "Media",
+    usages: "Automatically detects video/audio links",
+    cooldowns: 5
+};
 
-  onLoad: function () {
-    const fs = require("fs");
-    const path = __filename;
-    const fileData = fs.readFileSync(path, "utf8");
+// Supported platform detection
+function detectPlatform(url) {
+    const host = new URL(url).hostname.toLowerCase();
 
-    if (!fileData.includes('credits: "Shaan Babu"')) {
-      console.log("\n❌ ERROR: Credits Badle Gaye Hain! File Disabled ❌\n");
-      process.exit(1);
+    const platforms = [
+        {
+            match: /tiktok\.com$/,
+            fn: "tiktok"
+        },
+        {
+            match: /instagram\.com$/,
+            fn: "igdl"
+        },
+        {
+            match: /facebook\.com$|fb\.watch$/,
+            fn: "fbdown"
+        },
+        {
+            match: /twitter\.com$|x\.com$/,
+            fn: "twitter"
+        },
+        {
+            match: /youtube\.com$|youtu\.be$/,
+            fn: "youtube"
+        },
+        {
+            match: /spotify\.com$/,
+            fn: "spotify"
+        },
+        {
+            match: /soundcloud\.com$/,
+            fn: "soundcloud"
+        },
+        {
+            match: /threads\.net$/,
+            fn: "threads"
+        },
+        {
+            match: /capcut\.com$/,
+            fn: "capcut"
+        },
+        {
+            match: /mediafire\.com$/,
+            fn: "mediafire"
+        },
+        {
+            match: /drive\.google\.com$/,
+            fn: "gdrive"
+        },
+        {
+            match: /pinterest\.[a-z.]+$|pin\.it$/,
+            fn: "pinterest"
+        },
+        {
+            match: /xiaohongshu\.com$|xhslink\.com$/,
+            fn: "rednote"
+        },
+        {
+            match: /douyin\.com$/,
+            fn: "douyin"
+        },
+        {
+            match: /kuaishou\.com$|gifshow\.com$/,
+            fn: "kuaishou"
+        },
+        {
+            match: /snackvideo\.com$/,
+            fn: "snackvideo"
+        },
+        {
+            match: /cocofun\.com$/,
+            fn: "cocofun"
+        }
+    ];
+
+    return platforms.find(p => p.match.test(host))?.fn || null;
+}
+
+// Extract downloadable links from package response
+function extractLinks(data) {
+    const results = [];
+
+    const priority = [
+        "hdplay",
+        "no_watermark",
+        "normal_video",
+        "video",
+        "play",
+        "wmplay",
+        "downloadmp3",
+        "audio",
+        "mp3",
+        "videourl",
+        "rawurl",
+        "url",
+        "links",
+        "downloads",
+        "formats",
+        "result"
+    ];
+
+    function walk(value, key = "") {
+        if (!value) return;
+
+        const normalized = key.toLowerCase();
+
+        if (
+            typeof value === "string" &&
+            /^https?:\/\//i.test(value) &&
+            !/(thumbnail|cover|avatar|image)/i.test(normalized)
+        ) {
+            results.push({
+                url: value,
+                score: priority.findIndex(k => normalized.includes(k))
+            });
+            return;
+        }
+
+        if (Array.isArray(value)) {
+            for (const item of value) {
+                walk(item, key);
+            }
+            return;
+        }
+
+        if (typeof value === "object") {
+            for (const [k, v] of Object.entries(value)) {
+                walk(v, k);
+            }
+        }
     }
-  },
 
-  run: async function () {},
+    walk(data);
 
-  handleEvent: async function ({ api, event }) {
-    const axios = require("axios");
-    const fs = require("fs-extra");
-    const downloader = require("uzair-shan");
+    const unique = new Map();
 
-    const body = (event.body || "").trim();
-    if (!body.startsWith("https://")) return;
+    for (const item of results) {
+        if (!unique.has(item.url)) {
+            unique.set(item.url, item);
+        }
+    }
 
-    let filePath;
+    return [...unique.values()]
+        .sort((a, b) => {
+            const x = a.score < 0 ? 999 : a.score;
+            const y = b.score < 0 ? 999 : b.score;
+            return x - y;
+        })
+        .map(item => item.url);
+}
+
+// Download media into temporary file
+async function downloadFile(url) {
+    const tempDir = fs.mkdtempSync(
+        path.join(os.tmpdir(), "uzair-autodl-")
+    );
+
+    const filePath = path.join(
+        tempDir,
+        crypto.randomUUID() + ".mp4"
+    );
 
     try {
-      api.setMessageReaction("⏳", event.messageID, () => {}, true);
-
-      const host = new URL(body).hostname.toLowerCase();
-
-      const platforms = [
-        { match: /tiktok\.com$/, method: "tiktok" },
-        { match: /instagram\.com$/, method: "igdl" },
-        { match: /facebook\.com$|fb\.watch$/, method: "fbdown" },
-        { match: /twitter\.com$|x\.com$/, method: "twitter" },
-        { match: /youtube\.com$|youtu\.be$/, method: "youtube" },
-        { match: /spotify\.com$/, method: "spotify" },
-        { match: /soundcloud\.com$/, method: "soundcloud" },
-        { match: /threads\.net$/, method: "threads" },
-        { match: /capcut\.com$/, method: "capcut" },
-        { match: /mediafire\.com$/, method: "mediafire" },
-        { match: /drive\.google\.com$/, method: "gdrive" },
-        { match: /pinterest\.com$|pin\.it$/, method: "pinterest" },
-        { match: /xiaohongshu\.com$|xhslink\.com$/, method: "rednote" },
-        { match: /douyin\.com$/, method: "douyin" },
-        { match: /kuaishou\.com$/, method: "kuaishou" },
-        { match: /snackvideo\.com$/, method: "snackvideo" },
-        { match: /cocofun\.com$/, method: "cocofun" }
-      ];
-
-      const platform = platforms.find(p => p.match.test(host));
-      if (!platform || typeof downloader[platform.method] !== "function") {
-        throw new Error("Unsupported link");
-      }
-
-      const data = await downloader[platform.method](body);
-
-      if (!data || data.status === false) {
-        throw new Error("Download failed");
-      }
-
-      function findTitle(obj, depth = 0) {
-        if (!obj || depth > 6) return null;
-
-        if (typeof obj === "string") return null;
-
-        if (Array.isArray(obj)) {
-          for (const item of obj) {
-            const found = findTitle(item, depth + 1);
-            if (found) return found;
-          }
-          return null;
-        }
-
-        if (typeof obj === "object") {
-          for (const key of ["title", "topic", "caption", "description"]) {
-            if (typeof obj[key] === "string" && obj[key].trim()) {
-              return obj[key].trim();
+        const response = await axios.get(url, {
+            responseType: "stream",
+            timeout: 120000,
+            maxRedirects: 5,
+            maxContentLength: MAX_SIZE,
+            headers: {
+                "User-Agent": "Mozilla/5.0"
             }
-          }
+        });
 
-          for (const value of Object.values(obj)) {
-            const found = findTitle(value, depth + 1);
-            if (found) return found;
-          }
+        const contentType = (
+            response.headers["content-type"] || ""
+        ).toLowerCase();
+
+        const contentLength = Number(
+            response.headers["content-length"] || 0
+        );
+
+        if (
+            contentLength &&
+            contentLength > MAX_SIZE
+        ) {
+            throw new Error("Media exceeds 45 MB limit");
         }
 
-        return null;
-      }
-
-      function findMedia(obj, depth = 0) {
-        if (!obj || depth > 8) return null;
-
-        if (Array.isArray(obj)) {
-          for (const item of obj) {
-            const found = findMedia(item, depth + 1);
-            if (found) return found;
-          }
-          return null;
+        if (
+            contentType.includes("text/html") ||
+            contentType.includes("application/json")
+        ) {
+            throw new Error("Download URL did not return media");
         }
 
-        if (typeof obj !== "object") return null;
+        let received = 0;
 
-        const priority = [
-          "hd", "high", "normal_video", "video",
-          "play", "no_watermark", "wmplay",
-          "downloadmp3", "audio", "mp3",
-          "videourl", "rawurl", "url",
-          "links", "downloads", "formats", "result"
-        ];
+        const writer = fs.createWriteStream(filePath);
 
-        for (const key of priority) {
-          const value = obj[key];
+        response.data.on("data", chunk => {
+            received += chunk.length;
 
-          if (typeof value === "string" &&
-              /^https?:\/\//i.test(value) &&
-              !/thumbnail|cover|avatar|image/i.test(key)) {
-            return value;
-          }
+            if (received > MAX_SIZE) {
+                response.data.destroy(
+                    new Error("Media exceeds 45 MB limit")
+                );
+            }
+        });
 
-          if (value && typeof value === "object") {
-            const found = findMedia(value, depth + 1);
-            if (found) return found;
-          }
+        await new Promise((resolve, reject) => {
+            response.data.pipe(writer);
+
+            writer.on("finish", resolve);
+            writer.on("error", reject);
+            response.data.on("error", reject);
+        });
+
+        if (!fs.existsSync(filePath) || received === 0) {
+            throw new Error("Downloaded file is empty");
         }
 
-        return null;
-      }
+        const extension = contentType.includes("audio/")
+            ? "mp3"
+            : "mp4";
 
-      const videoTitle = findTitle(data) || "No Title Found";
-      const videoURL = findMedia(data);
+        const finalPath = path.join(
+            tempDir,
+            `Uzair-Rajput.${extension}`
+        );
 
-      if (!videoURL) throw new Error("Media URL not found");
+        fs.renameSync(filePath, finalPath);
 
-      const response = await axios.get(videoURL, {
-        responseType: "arraybuffer",
-        timeout: 120000,
-        maxContentLength: 45 * 1024 * 1024,
-        maxBodyLength: 45 * 1024 * 1024
-      });
+        return {
+            tempDir,
+            filePath: finalPath,
+            extension
+        };
 
-      const contentType = response.headers["content-type"] || "";
-      const isAudio =
-        /audio|mpeg|mp3/i.test(contentType) ||
-        ["spotify", "soundcloud"].includes(platform.method);
+    } catch (error) {
+        fs.rmSync(tempDir, {
+            recursive: true,
+            force: true
+        });
 
-      const extension = isAudio ? "mp3" : "mp4";
-
-      const cacheDir = __dirname + "/cache";
-      await fs.ensureDir(cacheDir);
-
-      filePath = `${cacheDir}/auto_${event.senderID}_${Date.now()}.${extension}`;
-
-      await fs.writeFile(filePath, Buffer.from(response.data));
-
-      api.setMessageReaction("✅", event.messageID, () => {}, true);
-
-      return api.sendMessage(
-        {
-          body: `✨❁ ━━ ━[ 𝐎𝐖𝐍𝐄𝐑 ]━ ━━ ❁✨\n\nᴛɪᴛʟᴇ: ${videoTitle}\n\n✨❁ ━━ ━[ 𝑺𝑯𝑨𝑨𝑵 ]━ ━━ ❁✨`,
-          attachment: fs.createReadStream(filePath),
-        },
-        event.threadID,
-        () => {
-          if (filePath && fs.existsSync(filePath)) {
-            fs.unlinkSync(filePath);
-          }
-        },
-        event.messageID
-      );
-
-    } catch (err) {
-      if (filePath && fs.existsSync(filePath)) {
-        fs.unlinkSync(filePath);
-      }
-
-      console.error("Auto Download Error:", err.message);
-      api.setMessageReaction("❌", event.messageID, () => {}, true);
+        throw error;
     }
-  },
+}
+
+// Send media to Messenger group
+async function sendMedia(api, threadID, file, platform) {
+    return new Promise((resolve, reject) => {
+        api.sendMessage(
+            {
+                body:
+                    `╭───「 UZAIR AUTO DOWNLOADER 」\n` +
+                    `│ Platform: ${platform}\n` +
+                    `│ Developer: Uzair Rajput\n` +
+                    `╰──────────────────`,
+                attachment: fs.createReadStream(file.filePath)
+            },
+            threadID,
+            error => {
+                if (error) reject(error);
+                else resolve();
+            }
+        );
+    });
+}
+
+// Automatic link handler
+module.exports.handleEvent = async function ({
+    api,
+    event
+}) {
+    if (
+        !event.body ||
+        event.senderID === api.getCurrentUserID()
+    ) return;
+
+    const urls = event.body.match(
+        /https?:\/\/[^\s<>"']+/gi
+    );
+
+    if (!urls || !urls.length) return;
+
+    const processed = new Set();
+
+    for (let url of urls.slice(0, 3)) {
+        url = url.replace(/[),.!?]+$/, "");
+
+        if (processed.has(url)) continue;
+        processed.add(url);
+
+        let platform;
+
+        try {
+            platform = detectPlatform(url);
+        } catch {
+            continue;
+        }
+
+        if (!platform) continue;
+
+        let tempFile;
+
+        try {
+            const downloaderFunction = downloader[platform];
+
+            if (typeof downloaderFunction !== "function") {
+                continue;
+            }
+
+            const result = await downloaderFunction(url);
+
+            if (
+                !result ||
+                result.status === false
+            ) {
+                throw new Error(
+                    result?.message || "Media not found"
+                );
+            }
+
+            let links = extractLinks(result);
+
+            // Generic AIO fallback
+            if (!links.length && typeof downloader.aio === "function") {
+                const fallback = await downloader.aio(url);
+
+                if (fallback && fallback.status !== false) {
+                    links = extractLinks(fallback);
+                }
+            }
+
+            if (!links.length) {
+                throw new Error("No downloadable media link found");
+            }
+
+            tempFile = await downloadFile(links[0]);
+
+            await sendMedia(
+                api,
+                event.threadID,
+                tempFile,
+                platform
+            );
+
+        } catch (error) {
+            console.error(
+                "[UZAIR AUTODL]",
+                platform,
+                error.message
+            );
+
+            api.sendMessage(
+                `❌ ${platform} download failed.\n${error.message}`,
+                event.threadID,
+                event.messageID
+            );
+
+        } finally {
+            if (tempFile?.tempDir) {
+                fs.rmSync(tempFile.tempDir, {
+                    recursive: true,
+                    force: true
+                });
+            }
+        }
+    }
+};
+
+// Manual command
+module.exports.run = async function ({
+    api,
+    event
+}) {
+    api.sendMessage(
+        "🤖 Uzair Auto Downloader is active.\nSend a supported social-media link.",
+        event.threadID,
+        event.messageID
+    );
 };
